@@ -1,0 +1,6 @@
+GLAD generator: 2.0.8
+Official source: https://github.com/Dav1dde/glad/tree/v2.0.8
+Command: python -m glad --api gl:core=3.3 --extensions "" --out-path third_party/glad --reproducible c
+The generator used the registry specifications bundled in GLAD 2.0.8.
+No generator or Python installation is needed to build this project.
+Generated files are unmodified.
