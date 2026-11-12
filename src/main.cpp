@@ -101,6 +101,11 @@ void keyCallback(GLFWwindow* window, int key, int, int action, int) {
     if (key == GLFW_KEY_N) input->app->newGame();
     if (key == GLFW_KEY_F2) input->app->startDemo();
     if (key == GLFW_KEY_R) input->app->resetCamera();
+    if (key == GLFW_KEY_T) input->app->cycleLocation();
+    if (key == GLFW_KEY_P) input->app->togglePause();
+    if (key == GLFW_KEY_B) input->app->toggleShadows();
+    if (key == GLFW_KEY_Q) input->app->toggleQuality();
+    if (key == GLFW_KEY_H || key == GLFW_KEY_F1) input->app->toggleHelp();
     if (key == GLFW_KEY_L) input->app->toggleLightMotion();
 }
 
@@ -172,7 +177,7 @@ int main(int argc, char** argv) {
                   << "GPU: " << glGetString(GL_RENDERER) << '\n'
                   << "LMB: select/place or drag | RMB: orbit | Wheel: zoom\n"
                   << "1-3: piece | Esc: cancel | N: new | F2: demo | R: reset view\n"
-                  << "L: animate light | Arrows + PgUp/PgDn: move light\n";
+                  << "T: scene | P: pause | B: shadows | Q: quality | F1: help | L: reset sun\n";
         {
             const auto seed = static_cast<std::uint32_t>(
                 std::chrono::system_clock::now().time_since_epoch().count());
