@@ -13,6 +13,6 @@ public:
 
 private:
     float yaw_ = 0.0f;
-    float pitch_ = 55.0f;
-    float radius_ = 13.8f;
+    float pitch_ = 38.0f;
+    float radius_ = 19.0f;
 };
