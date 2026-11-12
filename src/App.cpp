@@ -11,6 +11,7 @@ bool ScreenRect::contains(float px, float py) const {
 App::App(const std::filesystem::path& shaderDir, const std::filesystem::path& bestPath,
     std::uint32_t seed)
     : game_(seed), renderer_(shaderDir), hud_(shaderDir), bestPath_(bestPath), seed_(seed) {
+    rebuildScenery();
     readBest();
     resize(width_, height_);
 }
@@ -70,7 +71,8 @@ void App::saveBest() {
 
 void App::update(float deltaTime) {
     float dt = std::clamp(deltaTime, 0.0f, 0.1f);
-    time_ += dt;
+    float animationDt=paused_?0.0f:dt;
+    time_ += animationDt;
     messageTime_ = std::max(0.0f, messageTime_ - dt);
     fpsTime_ += std::max(deltaTime, 0.0f);
     ++fpsFrames_;
@@ -79,14 +81,10 @@ void App::update(float deltaTime) {
         fpsFrames_ = 0;
         fpsTime_ = 0.0f;
     }
-    if (animateLight_) {
-        light_.x = glm::sin(time_ * 0.6f) * 7.0f;
-        light_.z = glm::cos(time_ * 0.6f) * 7.0f;
-    }
     for (auto& particle : particles_) {
-        particle.life -= dt;
-        particle.velocity.y -= dt * 8.0f;
-        particle.position += particle.velocity * dt;
+        particle.life -= animationDt;
+        particle.velocity.y -= animationDt * 8.0f;
+        particle.position += particle.velocity * animationDt;
     }
     particles_.erase(std::remove_if(particles_.begin(), particles_.end(),
         [](const Particle& particle) { return particle.life <= 0.0f; }), particles_.end());
@@ -138,7 +136,7 @@ glm::vec2 App::boardCellScreen(int x, int z) const {
 }
 
 void App::select(int slot) {
-    if (slot >= 0 && slot < 3 && game_.pieces()[slot].available && !game_.gameOver()) {
+    if (!paused_ && !help_ && slot >= 0 && slot < 3 && game_.pieces()[slot].available && !game_.gameOver()) {
         selected_ = slot;
         message_ = "CLICK A CELL OR DRAG THE PIECE";
         messageTime_ = 0.0f;
@@ -147,6 +145,7 @@ void App::select(int slot) {
 }
 
 void App::pointerDown() {
+    if(paused_||help_)return;
     if (newRect_.contains(mouseX_, mouseY_) ||
         (game_.gameOver() && overlayRestart_.contains(mouseX_, mouseY_))) {
         newGame();
@@ -172,6 +171,7 @@ void App::pointerDown() {
 }
 
 void App::pointerUp() {
+    if(paused_||help_){dragging_=false;return;}
     if (dragging_ && hover_) {
         placeSelected();
     }
@@ -219,6 +219,7 @@ void App::placeSelected() {
 }
 
 void App::newGame() {
+    paused_=false;
     game_ = puzzle::Game(++seed_);
     demo_ = false;
     particles_.clear();
@@ -228,6 +229,7 @@ void App::newGame() {
 }
 
 void App::startDemo() {
+    paused_=false;
     game_.startDemo();
     demo_ = true;
     particles_.clear();
@@ -257,16 +259,23 @@ void App::moveLight(float dx, float dy, float dz, float deltaTime) {
     if (dx == 0.0f && dy == 0.0f && dz == 0.0f) {
         return;
     }
-    animateLight_ = false;
-    light_ += glm::vec3(dx, dy, dz) * std::min(deltaTime, 0.1f) * 5.0f;
-    light_.x = std::clamp(light_.x, -12.0f, 12.0f);
-    light_.y = std::clamp(light_.y, 2.0f, 14.0f);
-    light_.z = std::clamp(light_.z, -12.0f, 12.0f);
+    // Input changes spherical angles, never camera-space positions.
+    sun_.move(dx,dy-dz,deltaTime);
 }
 
-void App::toggleLightMotion() {
-    animateLight_ = !animateLight_;
+void App::toggleLightMotion() { sun_.reset(); }
+void App::cycleLocation() {
+    location_=static_cast<Location>((static_cast<int>(location_)+1)%3);
+    rebuildScenery(); // Does not reset puzzle or change the sun's world direction.
 }
+void App::togglePause() { paused_=!paused_;cancel(); }
+void App::toggleShadows() { shadows_=!shadows_; }
+void App::toggleQuality() { highQuality_=!highQuality_;rebuildScenery(); }
+void App::toggleHelp() { help_=!help_;cancel(); }
+glm::vec3 App::sunDirection() const {return sun_.direction();}
+Location App::location() const {return location_;}
+bool App::shadowsEnabled() const {return shadows_;}
+void App::rebuildScenery() {scenery_=Environment::build(location_,highQuality_);}
 
 const puzzle::Game& App::game() const {
     return game_;
@@ -282,8 +291,11 @@ void App::drawBoard() {
         static_cast<int>(boardRect_.w), static_cast<int>(boardRect_.h));
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
+    renderer_.configure(Environment::skyColor(location_),time_,shadows_,highQuality_);
     renderer_.begin(camera_.view(), camera_.projection(boardRect_.w / boardRect_.h),
-        camera_.position(), light_);
+        camera_.position(), sun_.direction());
+    for(const auto& object:scenery_)renderer_.draw(object);
+    for(const auto& object:Environment::animated(location_,time_,highQuality_))renderer_.draw(object);
     renderer_.box({0.0f, -0.35f, 0.0f}, {8.65f, 0.60f, 8.65f}, {0.16f, 0.24f, 0.36f}, 0.35f);
     for (int z = 0; z < puzzle::BoardSize; ++z) {
         for (int x = 0; x < puzzle::BoardSize; ++x) {
@@ -298,7 +310,7 @@ void App::drawBoard() {
             }
         }
     }
-    renderer_.box({light_.x, 0.21f, light_.z}, {0.19f, 0.19f, 0.19f}, {1.0f, 0.82f, 0.36f}, 0.0f, 0.85f);
+
     for (const auto& particle : particles_) {
         float size = 0.8f * std::max(particle.life / 0.6f, 0.05f);
         renderer_.box(particle.position, glm::vec3(size), particle.color, 0.08f, 0.25f);
@@ -316,6 +328,7 @@ void App::drawBoard() {
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
     }
+    renderer_.end(true);
 }
 
 void App::drawInterface() {
@@ -328,16 +341,17 @@ void App::drawInterface() {
     hud_.begin(width_, height_);
     hud_.text("BLOCK BLAST", 28 * s, 28 * s, 4.0f * s, white);
     hud_.text("3D", 310 * s, 35 * s, 2.5f * s, cyan);
-    hud_.text("BUILD. CLEAR. REPEAT.", 30 * s, 72 * s, 1.3f * s, muted);
+    hud_.text(std::string(Environment::name(location_))+" [T]   F1 HELP", 30 * s, 72 * s, 1.3f * s, muted);
     hud_.text(demo_ ? "DEMO SCORE" : "SCORE", sideX, 25 * s, 1.3f * s, muted);
     hud_.text(std::to_string(game_.score()), sideX, 48 * s, 3.4f * s, white);
     hud_.text("BEST", sideX + 183 * s, 25 * s, 1.3f * s, muted);
     hud_.text(std::to_string(best_), sideX + 183 * s, 48 * s, 3.0f * s, {1.0f, 0.79f, 0.35f, 1.0f});
     hud_.rect(28 * s, 103 * s, width_ - 56 * s, 1.0f * s, {0.18f, 0.25f, 0.35f, 1.0f});
-    hud_.text("THE BOARD", 30 * s, 121 * s, 1.3f * s, muted);
+    hud_.rect(boardRect_.x,boardRect_.y,boardRect_.w,22*s,{0.03f,0.06f,0.09f,0.78f});
+    hud_.text(paused_?"PAUSED [P]":"THE BOARD", (boardRect_.x+10*s), (boardRect_.y+7*s), 1.3f * s, muted);
     hud_.text("YOUR PIECES", sideX, 130 * s, 1.7f * s, white);
     if (game_.combo() > 0) {
-        hud_.text("COMBO X" + std::to_string(game_.combo()), 176 * s, 121 * s, 1.3f * s, cyan);
+        hud_.text("COMBO X" + std::to_string(game_.combo()), (boardRect_.x+180*s), (boardRect_.y+7*s), 1.3f * s, cyan);
     }
     for (int slot = 0; slot < 3; ++slot) {
         auto card = cards_[slot];
@@ -365,7 +379,7 @@ void App::drawInterface() {
     hud_.roundedRect(demoRect_.x, demoRect_.y, demoRect_.w, demoRect_.h, 8 * s,
         {0.13f, 0.19f, 0.29f, 1.0f});
     hud_.text("DEMO BOARD [F2]", demoRect_.x + 73 * s, demoRect_.y + 12 * s, 1.4f * s, white);
-    hud_.text("LIGHT: " + std::string(animateLight_ ? "MOVING" : "MANUAL"), sideX + 5 * s, 711 * s, 1.2f * s, muted);
+    hud_.text("SHADOWS: " + std::string(shadows_ ? "ON [B]" : "OFF [B]"), sideX + 5 * s, 711 * s, 1.2f * s, muted);
     hud_.text(std::to_string(fps_) + " FPS", sideX + 224 * s, 711 * s, 1.2f * s, muted);
     std::string status = messageTime_ > 0.0f ? message_ : selected_ >= 0 ?
         "CLICK TO PLACE   ESC TO CANCEL" : "CHOOSE A PIECE FROM THE RIGHT";
@@ -377,8 +391,12 @@ void App::drawInterface() {
     hud_.text(status, boardRect_.x + 10 * s, height_ - 73 * s, statusScale,
         messageTime_ > 0.0f ? messageColor_ : muted);
     hud_.rect(28 * s, height_ - 46 * s, width_ - 56 * s, 1 * s, {0.18f, 0.25f, 0.35f, 1.0f});
-    hud_.text("LMB PLACE   RMB ORBIT   WHEEL ZOOM   R VIEW   L LIGHT   ARROWS + PGUP/PGDN MOVE LIGHT",
+    hud_.text("T SCENE   P PAUSE   B SHADOWS   Q QUALITY   ARROWS SUN   L RESET SUN   F1 HELP",
         30 * s, height_ - 29 * s, 1.15f * s, muted);
+    std::string sunText="SUN AZ "+std::to_string(static_cast<int>(sun_.azimuthDegrees()))+
+        "  EL "+std::to_string(static_cast<int>(sun_.elevationDegrees()))+
+        (highQuality_?"   HIGH [Q]":"   LOW [Q]");
+    hud_.text(sunText,sideX+5*s,736*s,1.05f*s,muted);
     hud_.flush();
 }
 
@@ -424,6 +442,7 @@ void App::drawPieces() {
                 cell.z - (piece.height() - 1) * 0.5f}, {0.87f, 0.52f, 0.87f},
                 blockColor(piece.color), 0.12f, 0.12f);
         }
+        renderer_.end(false);
         glDisable(GL_SCISSOR_TEST);
     }
 }
@@ -461,5 +480,20 @@ void App::render() {
     drawInterface();
     drawPieces();
     drawGameOver();
+    drawHelp();
     glViewport(0, 0, width_, height_);
+}
+
+void App::drawHelp() {
+    if(!help_)return;
+    glViewport(0,0,width_,height_);hud_.begin(width_,height_);
+    hud_.rect(0,0,float(width_),float(height_),{0.02f,0.04f,0.07f,0.96f});
+    const char* lines[]={"BLOCK BLAST 3D - OUTDOOR EDITION", "F1 / H CLOSE HELP",
+        "LMB PLACE / DRAG    1-3 CHOOSE    ESC CANCEL", "RMB ORBIT    WHEEL ZOOM    R RESET CAMERA",
+        "T PARK / BEACH / WINTER    P PAUSE", "B SUN SHADOWS ON/OFF    Q HIGH / LOW QUALITY",
+        "LEFT / RIGHT SUN AZIMUTH    UP / DOWN SUN HEIGHT", "PAGE UP / DOWN ALSO CHANGE SUN HEIGHT    L RESET SUN",
+        "SUN STAYS FIXED WHEN THE CAMERA MOVES", "N NEW GAME    F2 DEMO BOARD",
+        "MARAT YERKANAT / AYAGAN BAGDAT", "ELEUSINOV DANIYAL / DIAS MADYSHEV"};
+    for(int i=0;i<12;++i)hud_.text(lines[i],65*scale_,(58+i*48)*scale_,1.65f*scale_,{0.9f,0.95f,1,1});
+    hud_.flush();
 }

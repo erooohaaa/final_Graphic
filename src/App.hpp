@@ -7,6 +7,7 @@
 #include "Hud.hpp"
 #include "OrbitCamera.hpp"
 #include "Renderer.hpp"
+#include "Environment.hpp"
 
 struct ScreenRect {
     float x;
@@ -34,7 +35,15 @@ public:
     void newGame();
     void startDemo();
     void moveLight(float dx, float dy, float dz, float deltaTime);
-    void toggleLightMotion();
+    void toggleLightMotion(); // Reset the fixed sun; retained for existing integration.
+    void cycleLocation();
+    void togglePause();
+    void toggleShadows();
+    void toggleQuality();
+    void toggleHelp();
+    glm::vec3 sunDirection() const;
+    Location location() const;
+    bool shadowsEnabled() const;
     const puzzle::Game& game() const;
     ScreenRect boardViewport() const;
     glm::vec2 boardCellScreen(int x, int z) const;
@@ -67,7 +76,10 @@ private:
     bool hover_ = false;
     bool dragging_ = false;
     bool demo_ = false;
-    bool animateLight_ = false;
+    SunPosition sun_;
+    Location location_=Location::Park;
+    bool paused_=false,shadows_=true,highQuality_=true,help_=false;
+    std::vector<SceneObject> scenery_;
     float mouseX_ = -1.0f;
     float mouseY_ = -1.0f;
     float time_ = 0.0f;
@@ -77,7 +89,6 @@ private:
     int fps_ = 0;
     std::string message_ = "SELECT A PIECE TO START";
     glm::vec4 messageColor_{0.56f, 0.69f, 0.81f, 1.0f};
-    glm::vec3 light_{-3.0f, 10.0f, 5.0f};
     std::vector<Particle> particles_;
     void updateHover();
     void placeSelected();
@@ -87,5 +98,7 @@ private:
     void drawInterface();
     void drawPieces();
     void drawGameOver();
+    void drawHelp();
+    void rebuildScenery();
     static glm::vec3 blockColor(int color);
 };
