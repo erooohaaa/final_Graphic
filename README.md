@@ -1,102 +1,82 @@
 # BlockBlast3D
 
-Учебная игра для Computer Graphics Fundamentals, OKG 2214, Astana IT University. Команда SE-2407: Marat Yerkanat, Ayagan Bagdat, Eleusinov Daniyal, Dias Madyshev.
+BlockBlast3D is a block-placement puzzle built with C++17 and OpenGL 3.3 Core. Place pieces on an 8 × 8 grid, clear full rows and columns, and build a combo by clearing lines on consecutive moves. The board is rendered in 3D and can be played in three outdoor environments.
 
-Размещай фигуры на поле 8×8 и освобождай заполненные строки и столбцы. Поле логически двумерное; кубы, камера, освещение и преобразования — трёхмерные. Это отдельный проект, его нужно распаковать в свою папку.
+Developed for **Computer Graphics Fundamentals (OKG 2214)** at **Astana IT University** by **SE-2407**: Marat Yerkanat, Ayagan Bagdat, Yeleussinov Daniyal, and Dias Madyshev.
 
-## Быстрый запуск на Windows
+## Run on Windows
 
-1. Распакуй архив в `C:\Projects\BlockBlast3D`, чтобы внутри этой папки находился `CMakeLists.txt`.
-2. В Visual Studio Installer проверь **Разработка классических приложений на C++** и **C++ CMake tools for Windows**.
-3. Дважды нажми `BUILD_AND_RUN.bat`.
+1. Download or clone the repository. If you downloaded a ZIP, extract it and open the folder containing `CMakeLists.txt`.
+2. In Visual Studio Installer, install **Desktop development with C++** and **C++ CMake tools for Windows**. Use a graphics driver that supports OpenGL 3.3 Core.
+3. Run [`BUILD_AND_RUN.bat`](BUILD_AND_RUN.bat). It configures an x64 Release build with Ninja, runs the configured tests, and launches the game.
 
-Скрипт сам найдёт установленную Visual Studio с инструментами C++, настроит x64, соберёт проект через Ninja, выполнит проверки игровой логики и откроет игру. Первая сборка дольше следующих. Интернет для зависимостей проекта не нужен. При ошибке окно останется открытым: пришли текст ошибки или скриншот.
+After the first build, you can launch `build-ninja\BlockBlast3D.exe` directly. Keep the generated `assets` folder beside the executable. GLFW, GLAD, and GLM are bundled under `third_party/`.
 
-После успешной сборки можно запускать `build-ninja\BlockBlast3D.exe`. Папка `assets` рядом с программой обязательна.
+### Build with Visual Studio CMake presets
 
-## Команды для Visual Studio 2026
-
-Альтернативный способ в PowerShell; CMake должен быть доступен как команда. Для генератора VS2026 нужен CMake 4.2 или новее.
+Run these commands from the repository root in PowerShell. The Visual Studio 2026 preset requires CMake 4.2 or newer.
 
 ```powershell
-cd C:\Projects\BlockBlast3D
 cmake --preset windows-vs2026
 cmake --build --preset windows-vs2026-release
 ctest --preset windows-vs2026-release
 .\build-vs2026\Release\BlockBlast3D.exe
 ```
 
-Выполняй следующую команду после успешного завершения предыдущей. Для VS2022 замени `vs2026` на `vs2022` во всех четырёх командах. Каталоги сборки разделены; удалять папки прежнего Roblox-проекта не требуется.
+For Visual Studio 2022, replace `vs2026` with `vs2022` in the presets and executable path.
 
-## Обновлённая графика без людей
+## Controls
 
-Три процедурных окружения: парк с округлыми деревьями, кустами, цветами, каменными дорожками и деревянными скамейками; пляж с пальмами, зонтиками, шезлонгами и анимированной водой; зимний сад со снежными кронами, ёлкой, шарами, подарками и гирляндой. Людей нет. Игровое поле установлено на деревянной подставке.
+| Input | Action |
+| --- | --- |
+| Left click or drag | Select and place a piece |
+| `1` / `2` / `3` | Select a piece from the tray |
+| `Esc` | Cancel selection |
+| Right mouse button + drag | Orbit the camera around the board |
+| Mouse wheel | Zoom in or out |
+| `R` | Reset the camera |
+| `N` / `F2` | Start a new game / open the demo board |
+| `T` | Cycle through the park, beach, and winter garden |
+| `P` | Pause or resume animations and piece placement |
+| `B` / `Q` | Toggle shadows / switch graphics quality |
+| `←` / `→` | Adjust the sun's azimuth |
+| `↑` / `↓` or `Page Up` / `Page Down` | Adjust the sun's elevation |
+| `L` | Reset the sun direction |
+| `F1` / `H` | Open the controls and team information |
 
-Рендеринг: направленное солнце в мировых координатах, бесконечное небо с облаками и солнечным диском, shadow mapping с PCF-фильтрацией, процедурные материалы, GGX-блики и лёгкая атмосферная дымка. Солнце задаётся азимутом и высотой и не перемещается вместе с камерой. Это стилизованная графика из процедурных примитивов, не фотореализм и не уровень AAA.
+## Gameplay and scoring
 
-Установка обновления: `INSTALL_UPDATE_RU.md`.
+- Each piece must fit entirely within the board and occupy only empty cells. The placement preview is green for a valid move and red for an invalid one.
+- The game deals three new pieces after all three pieces in the current tray are placed.
+- A move clears all full rows and columns at once. Cells where cleared rows and columns intersect are removed once, while each completed line counts toward the score.
+- A move earns `10 × placed cubes + 100 × cleared lines × combo`. The combo starts at 1 on the first clearing move, increases with consecutive clearing moves, and resets to 0 on a move that clears no lines.
+- The game ends when none of the remaining pieces fits anywhere on the board.
 
-## Управление
+Press **F2** to load a demo with two empty cells in the front row and a matching piece already selected. Fill the gap to demonstrate line clearing. Demo scores are excluded from the saved record. On Windows, the record is stored in `%LOCALAPPDATA%\AITUBlockBlast3D\best.txt`. On Linux, it is stored in `$XDG_DATA_HOME/AITUBlockBlast3D/best.txt`, with `~/.local/share/AITUBlockBlast3D/best.txt` as the fallback.
 
-| Действие | Кнопка |
-|---|---|
-| Выбор и установка фигуры, перетаскивание | ЛКМ |
-| Выбор фигуры | 1 / 2 / 3 |
-| Отмена выбора | Esc |
-| Камера | ПКМ + мышь; колесо — масштаб |
-| Начальная камера | R |
-| Новая партия / демонстрация | N / F2 |
-| Парк → пляж → зима, без сброса партии | T |
-| Пауза | P |
-| Солнечные тени ON/OFF | B |
-| Высокое / низкое качество | Q |
-| Азимут солнца | ← / → |
-| Высота солнца | ↑ / ↓ либо Page Up / Page Down |
-| Сброс солнца | L |
-| Помощь и имена команды | F1 / H |
+## Environments and rendering
 
-Солнце остаётся в заданном направлении до нового ввода; автоматического движения нет. Высота ограничена 8–82°. Видимый солнечный диск может находиться за пределами кадра; он не помещён среди объектов. Зелёный preview фигуры означает допустимое размещение, красный — пересечение или выход за границы.
+- **Garden Park** features rounded trees, flower beds, stone paths, and wooden benches.
+- **Sunlit Coast** features palms, beach umbrellas, lounge chairs, and animated water.
+- **Winter Garden** features snowy trees, falling snow, and a decorated holiday tree.
 
-## Правила и очки
+Switching environments preserves the board and score. The sun uses a world-space direction shared by the lighting, shadows, and visible solar disc. Moving the camera leaves that direction fixed. The controls adjust azimuth and elevation, with elevation limited to 8–82°.
 
-- Фигуру можно поставить только целиком на свободные клетки поля.
-- Использованная карточка исчезает из набора. Новый набор из трёх фигур появляется после использования всех трёх.
-- Все полностью заполненные строки и столбцы очищаются одновременно. Общая клетка пересекающихся линий исчезает один раз.
-- За каждый установленный куб начисляется 10 очков.
-- Дополнительно начисляется `100 × число очищенных линий × combo`.
-- Combo равен 1 при первом ходе с очисткой и растёт при последующих подряд ходах с очисткой. Ход без очистки сбрасывает его в 0.
-- Game Over наступает, когда ни одна оставшаяся фигура не помещается ни в одном месте поля.
-- Рекорд обычной игры сохраняется в `%LOCALAPPDATA%\AITUBlockBlast3D\best.txt` на Windows. Demo Board служит для показа очистки и не повышает рекорд.
+The renderer uses GLSL 330, procedural materials, GGX specular highlights, and percentage-closer filtering (PCF) for the shadow map. The sky shader draws clouds and the sun in the distance. **High** quality uses a 2048 × 2048 shadow map and more scenery detail. **Low** quality uses a 1024 × 1024 map and fewer decorative objects.
 
-На Linux рекорд хранится в `$XDG_DATA_HOME/AITUBlockBlast3D/best.txt`, а если эта переменная не задана — в `$HOME/.local/share/AITUBlockBlast3D/best.txt`.
+## Project layout
 
-Для быстрого показа нажми `F2`: программа подготовит переднюю строку с двумя пустыми клетками и выберет подходящую фигуру. Закрой эти клетки, затем подвигай камеру и свет. Нажми `N`, чтобы начать обычную игру.
+| Path | Responsibility |
+| --- | --- |
+| `src/Game.cpp`, `src/Game.hpp` | Board rules, piece generation, scoring, and game-over detection |
+| `src/App.cpp`, `src/main.cpp`, `src/OrbitCamera.cpp` | Input, application state, and camera controls |
+| `src/Environment.cpp`, `src/Renderer.cpp`, `src/Hud.cpp` | Procedural scenery, rendering passes, and interface |
+| `assets/shaders/` | World, shadow depth, sky, and interface shaders |
+| `tests/` | Gameplay, environment, and OpenGL integration tests |
+| `third_party/` | GLFW 3.4, GLAD for OpenGL 3.3 Core, and GLM 1.0.1 |
 
-## Графика и состав
+The root `CMakeLists.txt` requires CMake 3.21 or newer and copies runtime assets to the build output.
 
-OpenGL 3.3 core, GLSL 330, C++17, GLFW, GLAD, GLM. Структура проекта сохранена: исходники в `src`, шейдеры в `assets/shaders`, один корневой CMakeLists.txt. Новое окружение находится в `src/Environment.cpp/.hpp`; People.cpp и SceneTypes.hpp не нужны.
+## Validation
 
-World pass использует world.vert/.frag; depth pass — shadow.vert/.frag; бесконечное небо — sky.vert/.frag; интерфейс — hud.vert/.frag. CMake копирует assets при каждой сборке, включая изменения только в шейдерах.
-
-Качество HIGH: depth map 2048, больше деревьев, травы и снежинок. LOW: depth map 1024 и меньше декоративных объектов. Размер shadow map меняется при отрисовке сцены, если тени включены. Геометрия окружения кэшируется и пересоздаётся только при смене локации/качества.
-
-Игровые правила и формат сохранения рекорда остались прежними. Фигуры не вращаются пользователем; физики падения, сети, bloom, SSAO и загрузки сторонних 3D-моделей нет.
-
-## Зависимости
-
-| Компонент | Версия / назначение |
-|---|---|
-| GLFW | 3.4; окно, контекст, ввод |
-| GLAD | Загрузчик, созданный GLAD 2.0.8 для OpenGL 3.3 core |
-| GLM | 1.0.1; векторы и матрицы |
-| CMake | 3.21+ для проекта; 4.2+ для генератора Visual Studio 2026 |
-
-Исходники библиотек включены в `third_party`. GLFW и GLAD собираются статически, GLM используется через заголовки. В этой версии не нужны freeglut, GLEW, stb_image, Dear ImGui, Python или загрузка текстур: текстура создаётся программой.
-
-## Проверка и документация
-
-Смотрите `docs/VALIDATION.md`. Выполнены GameLogic, EnvironmentAndSun и RealOpenGL: сборка Linux Release, реальные шейдеры и shadow FBO через EGL/Mesa, сравнение теней ON/OFF, все сцены, picking, сохранение счёта, help, resize и отсутствие параллакса у солнца.
-
-Windows BAT оставлен без изменений; нативный запуск на Windows в этой среде не проверен. Замерьте FPS на своём GPU при 1280×720; тестовый программный рендерер не является аппаратным benchmark.
-
-Существенная помощь генерации кода описана в AI_USE.md. Источники и лицензии библиотек — THIRD_PARTY.md. Скриншот `docs/outdoor_preview.png` получен из этой сборки, а не сгенерирован как концепт.
+The integrated build passed `GameLogic`, `EnvironmentAndSun`, and `RealOpenGL` in a Linux Release build. The OpenGL test used EGL with Mesa software rendering to check scene rendering, shadow toggling, piece placement with the mouse, score retention during scene switches, window resizing, and stable sunlight direction. Windows launch and GPU performance can be verified on the target machine using the build steps above.
