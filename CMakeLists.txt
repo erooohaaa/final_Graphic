@@ -41,6 +41,7 @@ add_executable(BlockBlast3D
     src/Shader.cpp
     src/Renderer.cpp
     src/Texture.cpp
+    src/Environment.cpp
     src/Hud.cpp
 )
 
@@ -54,12 +55,14 @@ else()
     target_compile_options(BlockBlast3D PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_custom_command(TARGET BlockBlast3D POST_BUILD
+add_custom_target(BlockBlastAssets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:BlockBlast3D>/assets"
     VERBATIM
 )
+
+add_dependencies(BlockBlastAssets BlockBlast3D)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT BlockBlast3D)
 set_property(TARGET BlockBlast3D PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:BlockBlast3D>")
@@ -78,3 +81,26 @@ endif()
 
 install(TARGETS BlockBlast3D RUNTIME DESTINATION .)
 install(DIRECTORY assets DESTINATION .)
+
+if(BUILD_TESTING)
+    add_executable(EnvironmentTests tests/EnvironmentTests.cpp src/Environment.cpp)
+    target_include_directories(EnvironmentTests PRIVATE src)
+    target_link_libraries(EnvironmentTests PRIVATE glm::glm)
+    add_test(NAME EnvironmentAndSun COMMAND EnvironmentTests)
+endif()
+
+option(BLOCKBLAST_EGL_TEST "Linux surfaceless rendering checks (not needed on Windows)" OFF)
+if(BUILD_TESTING AND BLOCKBLAST_EGL_TEST)
+    if(NOT UNIX OR APPLE)
+        message(FATAL_ERROR "EGL checks require Linux; leave this option OFF on Windows")
+    endif()
+    find_library(BLOCKBLAST_EGL NAMES EGL libEGL.so.1 REQUIRED)
+    get_target_property(BLOCKBLAST_SOURCES BlockBlast3D SOURCES)
+    list(REMOVE_ITEM BLOCKBLAST_SOURCES src/main.cpp)
+    add_executable(RenderTests tests/RenderTests.cpp ${BLOCKBLAST_SOURCES})
+    target_include_directories(RenderTests PRIVATE src)
+    target_link_libraries(RenderTests PRIVATE glad glm::glm ${BLOCKBLAST_EGL} ${CMAKE_DL_LIBS})
+    add_dependencies(RenderTests BlockBlastAssets)
+    add_test(NAME RealOpenGL COMMAND RenderTests "${CMAKE_BINARY_DIR}/assets/shaders")
+    set_tests_properties(RealOpenGL PROPERTIES WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
